@@ -1,0 +1,45 @@
+LICENCJE CZCIONEK CINZEL I INTER — PO POLSKU
+
+Poniżej znajduje się nieoficjalne tłumaczenie pomocnicze licencji SIL Open Font License 1.1. Nie zastępuje ono oryginalnej licencji angielskiej, dostępnej w zakładce „Oryginały”. Licencja dotyczy czcionek, a nie całej aplikacji Aion2PL.
+
+AUTORZY
+Cinzel: autorzy projektu Cinzel, 2020; Natanael Gama, 2012. Zastrzeżona nazwa wskazana przez autorów: „Cinzel Decorative”.
+Inter: autorzy projektu Inter, 2016 (https://github.com/rsms/inter).
+Pełne, niezmienione informacje o prawach autorskich znajdują się przy oryginalnych licencjach.
+
+SIL OPEN FONT LICENSE, WERSJA 1.1 — 26 LUTEGO 2007
+
+WSTĘP
+Celem licencji Open Font License (OFL) jest wspieranie światowego rozwoju wspólnie tworzonych projektów czcionek, wspieranie prac społeczności akademickich i językoznawczych nad czcionkami oraz zapewnienie wolnych i otwartych zasad udostępniania i ulepszania czcionek we współpracy z innymi.
+
+OFL pozwala swobodnie używać, badać, modyfikować i rozpowszechniać objęte nią czcionki, pod warunkiem że nie są sprzedawane samodzielnie. Czcionki, w tym utwory pochodne, mogą być dołączane do dowolnego oprogramowania, osadzane w nim, rozpowszechniane lub sprzedawane wraz z nim, pod warunkiem nieużywania zastrzeżonych nazw w wersjach pochodnych. Czcionek i ich wersji pochodnych nie można jednak udostępniać na innej licencji. Wymóg pozostawania na tej licencji nie obejmuje dokumentów utworzonych przy użyciu tych czcionek lub ich wersji pochodnych.
+
+DEFINICJE
+„Oprogramowanie czcionki” oznacza zbiór plików udostępnionych przez posiadaczy praw autorskich na tej licencji i wyraźnie tak oznaczonych. Może obejmować pliki źródłowe, skrypty budowania i dokumentację.
+
+„Zastrzeżona nazwa czcionki” oznacza każdą nazwę wskazaną jako zastrzeżona po informacji o prawach autorskich.
+
+„Wersja oryginalna” oznacza zbiór składników oprogramowania czcionki w postaci rozpowszechnianej przez posiadaczy praw autorskich.
+
+„Wersja zmodyfikowana” oznacza dowolną wersję pochodną powstałą przez dodanie, usunięcie lub zastąpienie całości lub części składników wersji oryginalnej, zmianę formatów albo przeniesienie oprogramowania czcionki do nowego środowiska.
+
+„Autor” oznacza projektanta, inżyniera, programistę, autora dokumentacji technicznej lub inną osobę, która wniosła wkład w oprogramowanie czcionki.
+
+ZEZWOLENIE I WARUNKI
+Każdej osobie, która otrzyma kopię oprogramowania czcionki, udziela się nieodpłatnie zezwolenia na używanie, badanie, kopiowanie, łączenie, osadzanie, modyfikowanie, rozpowszechnianie oraz sprzedaż zmodyfikowanych i niezmodyfikowanych kopii, pod następującymi warunkami:
+
+1. Ani oprogramowanie czcionki, ani żaden jego składnik, w wersji oryginalnej lub zmodyfikowanej, nie może być sprzedawany samodzielnie.
+
+2. Wersje oryginalne lub zmodyfikowane mogą być dołączane do dowolnego oprogramowania, rozpowszechniane lub sprzedawane wraz z nim, pod warunkiem że każda kopia zawiera powyższą informację o prawach autorskich oraz tę licencję. Mogą one występować jako osobne pliki tekstowe, nagłówki czytelne dla człowieka albo odpowiednie pola metadanych w plikach tekstowych lub binarnych, o ile użytkownik może je łatwo wyświetlić.
+
+3. Wersja zmodyfikowana nie może używać zastrzeżonych nazw czcionki bez wyraźnego pisemnego zezwolenia odpowiedniego posiadacza praw autorskich. Ograniczenie to dotyczy wyłącznie głównej nazwy czcionki prezentowanej użytkownikom.
+
+4. Nazwisk lub nazw posiadaczy praw autorskich ani autorów nie wolno używać do promowania, popierania lub reklamowania wersji zmodyfikowanej, z wyjątkiem podziękowania za ich wkład albo za ich wyraźnym pisemnym zezwoleniem.
+
+5. Oprogramowanie czcionki, zmodyfikowane lub niezmodyfikowane, w całości lub części, musi być rozpowszechniane w całości na tej licencji i nie może być rozpowszechniane na innej licencji. Wymóg pozostawania na tej licencji nie dotyczy dokumentów utworzonych przy użyciu oprogramowania czcionki.
+
+WYGAŚNIĘCIE
+Niniejsza licencja traci ważność w razie niespełnienia któregokolwiek z powyższych warunków.
+
+WYŁĄCZENIE GWARANCJI I ODPOWIEDZIALNOŚCI
+OPROGRAMOWANIE CZCIONKI JEST UDOSTĘPNIANE „TAK JAK JEST”, BEZ JAKICHKOLWIEK GWARANCJI, WYRAŹNYCH LUB DOROZUMIANYCH, W TYM GWARANCJI WARTOŚCI HANDLOWEJ, PRZYDATNOŚCI DO OKREŚLONEGO CELU ORAZ NIENARUSZANIA PRAW AUTORSKICH, PATENTÓW, ZNAKÓW TOWAROWYCH ANI INNYCH PRAW. POSIADACZ PRAW AUTORSKICH W ŻADNYM WYPADKU NIE PONOSI ODPOWIEDZIALNOŚCI ZA ROSZCZENIA, SZKODY ANI INNE ZOBOWIĄZANIA, W TYM SZKODY OGÓLNE, SZCZEGÓLNE, POŚREDNIE, UBOCZNE LUB WYNIKOWE, NIEZALEŻNIE OD TEGO, CZY WYNIKAJĄ Z UMOWY, CZYNU NIEDOZWOLONEGO LUB INNEJ PODSTAWY, POWSTAŁE W ZWIĄZKU Z UŻYWANIEM LUB NIEMOŻNOŚCIĄ UŻYWANIA OPROGRAMOWANIA CZCIONKI ALBO INNYMI CZYNNOŚCIAMI Z NIM ZWIĄZANYMI.

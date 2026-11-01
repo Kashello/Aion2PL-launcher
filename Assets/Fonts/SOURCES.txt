@@ -1,0 +1,9 @@
+Fonts bundled unmodified under SIL Open Font License 1.1.
+Cinzel Bold: https://github.com/NDISCOVER/Cinzel/tree/master/fonts/ttf
+License: https://github.com/NDISCOVER/Cinzel/blob/master/OFL.txt
+Inter Regular / Bold 4.1: https://github.com/rsms/inter/releases/tag/v4.1
+License: LICENSE.txt from Inter-4.1.zip (retained as Inter-OFL.txt).
+Downloaded 2026-10-15. Original copyright and complete licenses are retained.
+Cinzel-Bold.ttf SHA256 0C23EC565DB45C5508EE95889C60AD87DEBD167CA07167A43A5D68572B4E2EAC
+Inter-Bold.ttf SHA256 288316099B1E0A47A4716D159098005EEF7C0066921F34E3200393DBDB01947F
+Inter-Regular.ttf SHA256 40D692FCE188E4471E2B3CBA937BE967878F631AD3EBBBDCD587687C7EBE0C82
