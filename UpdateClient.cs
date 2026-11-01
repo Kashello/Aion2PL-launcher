@@ -47,7 +47,7 @@ internal sealed class UpdateClient : IDisposable
     {
         http = new HttpClient(handler ?? new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false, UseDefaultCredentials = false });
         http.Timeout = TimeSpan.FromSeconds(90);
-        http.DefaultRequestHeaders.UserAgent.ParseAdd("Aion2PL-Launcher/0.5.5");
+        http.DefaultRequestHeaders.UserAgent.ParseAdd("Aion2PL-Launcher/0.5.6");
     }
     internal static Uri Https(string url)
     {

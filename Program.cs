@@ -67,7 +67,7 @@ internal sealed partial class LauncherWindow : Form
 
     internal LauncherWindow(bool checkNetwork)
     {
-        Text = "Aion2PL by kashello — 0.5.5";
+        Text = "Aion2PL by kashello — 0.5.6";
         using var iconStream = typeof(Program).Assembly.GetManifestResourceStream("aion2pl.ico")!;
         using var loadedIcon = new Icon(iconStream);
         Icon = (Icon)loadedIcon.Clone();
@@ -126,13 +126,18 @@ internal sealed partial class LauncherWindow : Form
         right.Controls.Add(status, 0, 4);
         refresh = Button("Odśwież", true);
         refresh.Dock = DockStyle.None;
-        refresh.Size = new Size(130, 38);
+        refresh.Size = new Size(100, 38);
         refresh.Click += async (_, _) => await CheckUpdates();
         var actions = new FlowLayoutPanel { Dock = DockStyle.Fill };
         actions.Controls.Add(refresh);
+        checkLauncher = Button("Sprawdź launcher", true);
+        checkLauncher.Dock = DockStyle.None;
+        checkLauncher.Size = new Size(164, 38);
+        checkLauncher.Click += async (_, _) => await CheckLauncherManually();
+        actions.Controls.Add(checkLauncher);
         fixFont = Button("Napraw polskie znaki", true);
         fixFont.Dock = DockStyle.None;
-        fixFont.Size = new Size(224, 38);
+        fixFont.Size = new Size(200, 38);
         fixFont.Click += async (_, _) => await RepairPolishCharacters();
         actions.Controls.Add(fixFont);
         actions.Controls.Add(details);

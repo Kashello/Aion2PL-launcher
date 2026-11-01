@@ -11,10 +11,10 @@ internal sealed partial class LauncherWindow
     readonly RichTextBox logBox = new() { Dock = DockStyle.Bottom, Height = 235, ReadOnly = true, Visible = false,
         BackColor = Color.FromArgb(15, 13, 25), ForeColor = Color.FromArgb(208, 202, 233),
         Font = new Font("Consolas", 8.5f), BorderStyle = BorderStyle.FixedSingle, DetectUrls = false };
-    readonly CheckBox details = new() { Text = "Pokaż szczegóły działań", AutoSize = true, Margin = new Padding(18, 17, 0, 0) };
+    readonly CheckBox details = new() { Text = "Pokaż szczegóły", AutoSize = true, Margin = new Padding(12, 17, 0, 0) };
     readonly Label versions = new();
     readonly string dataRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Aion2PL");
-    Button choose = null!, refresh = null!, install = null!, restore = null!, fixFont = null!;
+    Button choose = null!, refresh = null!, install = null!, restore = null!, fixFont = null!, checkLauncher = null!;
     Release? release;
     InstallState? installed;
     Installer? installer;
@@ -29,7 +29,7 @@ internal sealed partial class LauncherWindow
     void ConfigureUpdates(bool checkNetwork)
     {
         details.ForeColor = Muted;
-        details.CheckedChanged += (_, _) => { logBox.Visible = details.Checked; details.Text = details.Checked ? "Ukryj szczegóły działań" : "Pokaż szczegóły działań"; };
+        details.CheckedChanged += (_, _) => { logBox.Visible = details.Checked; details.Text = details.Checked ? "Ukryj szczegóły" : "Pokaż szczegóły"; };
         Log(installation is null ? "Wskaż folder gry." : $"Wykryto AION 2, Steam build {installation.Build}.");
         if (checkNetwork)
         {
@@ -143,7 +143,34 @@ internal sealed partial class LauncherWindow
         fixFont.Text = fontReady ? "Znaki: ustawione" : "Napraw polskie znaki";
         fixFont.AccessibleName = fixFont.Text;
         fixFont.Enabled = !busy && !pending && game is { Updating: false, DatPresent: true } && !fontReady;
-        choose.Enabled = refresh.Enabled = !busy;
+        choose.Enabled = refresh.Enabled = checkLauncher.Enabled = !busy;
+    }
+    async Task CheckLauncherManually()
+    {
+        if (busy) return;
+        busy = true;
+        RenderStatus();
+        try
+        {
+            Log("Sprawdzam aktualizacje launchera na GitHubie...");
+            var latest = await client.LatestLauncher(lifetime.Token);
+            if (latest is null)
+            {
+                MessageBox.Show(this, "Nie znaleziono jeszcze wydania launchera na GitHubie.", "Aion2PL", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            else if (!latest.IsNewer())
+            {
+                MessageBox.Show(this, "Launcher jest aktualny.", "Aion2PL", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            else if (await LauncherSelfUpdate.Prepare(latest, client, Log, lifetime.Token))
+            {
+                busy = false;
+                Close();
+                return;
+            }
+        }
+        catch (Exception e) when (Expected(e) || e is System.ComponentModel.Win32Exception or KeyNotFoundException) { Failure(e); }
+        finally { busy = false; if (!IsDisposed) RenderStatus(); }
     }
     async Task RepairPolishCharacters()
     {

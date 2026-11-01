@@ -23,6 +23,8 @@ Osoby z już zainstalowanym spolszczeniem mogą wybrać **Napraw polskie znaki**
 
 Launcher sprawdza dostępność spolszczenia na [kashello.pl](https://kashello.pl) oraz nowych wersji launchera na GitHubie. Po aktualizacji gry należy poczekać na paczkę zgodną z nową wersją AION 2.
 
+Przycisk **Sprawdź launcher** pozwala w dowolnej chwili sprawdzić jego aktualizacje i wyświetlić informację o bieżącym stanie.
+
 **Ważne:** użytkownicy launcherów starszych niż 0.5.4 muszą pobrać nowy plik EXE ręcznie jeden raz. Wersja 0.5.4 potrafi automatycznie pobierać kolejne wydania launchera.
 
 ## Przywracanie oryginału
