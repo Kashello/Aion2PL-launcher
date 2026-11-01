@@ -14,7 +14,7 @@ internal sealed partial class LauncherWindow
     readonly CheckBox details = new() { Text = "Pokaż szczegóły działań", AutoSize = true, Margin = new Padding(18, 17, 0, 0) };
     readonly Label versions = new();
     readonly string dataRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Aion2PL");
-    Button choose = null!, refresh = null!, install = null!, restore = null!;
+    Button choose = null!, refresh = null!, install = null!, restore = null!, fixFont = null!;
     Release? release;
     InstallState? installed;
     Installer? installer;
@@ -137,7 +137,28 @@ internal sealed partial class LauncherWindow
         catch (Exception e) when (Expected(e)) { Log(e.Message); needsOriginal = true; }
         restore.Text = pending ? "Cofnij przerwaną operację" : needsOriginal ? hasManualCopy ? "Przywróć z kopii PAK" : "Przywróć oryginał przez Steam" : "Przywróć oryginał";
         restore.Enabled = !busy && installer is not null && (installed is not null || pending || manualMatch);
+        bool fontReady = false;
+        try { fontReady = installer?.FontFixEnabled() == true; }
+        catch (Exception e) when (Expected(e)) { Log(e.Message); }
+        fixFont.Text = fontReady ? "Znaki: ustawione" : "Napraw polskie znaki";
+        fixFont.AccessibleName = fixFont.Text;
+        fixFont.Enabled = !busy && !pending && game is { Updating: false, DatPresent: true } && !fontReady;
         choose.Enabled = refresh.Enabled = !busy;
+    }
+    async Task RepairPolishCharacters()
+    {
+        if (busy || installer is null || !fixFont.Enabled) return;
+        busy = true;
+        RenderStatus();
+        try
+        {
+            var target = installer;
+            var changed = await Task.Run(() => target.RepairFont());
+            MessageBox.Show(this, changed ? "Ustawienia polskich znaków zapisano. Uruchom ponownie grę, aby sprawdzić książki i tytuły." : "Ustawienia polskich znaków są już obecne.",
+                "Aion2PL", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        catch (Exception e) when (Expected(e)) { Failure(e); }
+        finally { busy = false; RefreshGame(); }
     }
     async Task CheckUpdates()
     {

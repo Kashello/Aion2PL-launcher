@@ -158,12 +158,17 @@ internal static class UpdateTests
             var manualInstaller = new Installer(root, Path.Combine(scratch, "manual-user-data"), _ => { }, () => { });
             manualInstaller.Install(meta, new Dictionary<string, byte[]> { [GameInstallation.DatPath] = Dat(1) });
             Check(manualInstaller.State() is null && !manualInstaller.HasPending && File.ReadAllBytes(dat).SequenceEqual(Dat(1)), "Ręczna zgodna instalacja jest rozpoznana bez ponownego instalowania i tworzenia kopii");
+            File.WriteAllText(config, "[Graphics]\nQuality=High\n");
+            Check(manualInstaller.RepairFont() && FontCulture.Enabled(File.ReadAllBytes(config)) && File.ReadAllBytes(dat).SequenceEqual(Dat(1)), "Osobna naprawa znaków bez pobierania i zmiany ręcznego DAT");
+            Check(!manualInstaller.RepairFont(), "Ponowna naprawa rozpoznaje obecne ustawienie");
+            File.AppendAllText(config, "[User]\nValue=1\n");
             File.WriteAllText(pak + ".backup", "unverified manual backup");
             Check(manualInstaller.NeedsSteamVerification(), "Ręczna kopia bez potwierdzenia buildu prowadzi do weryfikacji Steam");
             File.WriteAllText(pak, "steam verified original");
             Check(!manualInstaller.NeedsSteamVerification(), "Aktywny oryginalny PAK pozwala dokończyć przywracanie");
             manualInstaller.Restore(new Dictionary<string, byte[]> { [GameInstallation.DatPath] = Dat(1) });
             Check(!File.Exists(dat) && File.ReadAllText(pak) == "steam verified original" && File.ReadAllText(pak + ".backup") == "unverified manual backup", "Cofnięcie ręcznej instalacji zachowuje oryginał Steam i nieużywaną ręczną kopię");
+            Check(File.ReadAllText(config).Contains("Value=1") && !FontCulture.Enabled(File.ReadAllBytes(config)), "Cofnięcie ręcznej instalacji usuwa poprawkę znaków i zachowuje ustawienia użytkownika");
             File.WriteAllText(dat, "original dat");
             File.WriteAllText(pak, "original pak");
             File.Delete(config);

@@ -17,6 +17,8 @@ Na stronie wydania plik znajduje się w sekcji **Assets**. Launcher działa w sy
 
 Launcher dodaje również ustawienie poprawiające wyświetlanie polskich znaków w części książek i tytułów. Jeśli spolszczenie było wcześniej wgrane ręcznie, może być potrzebne użycie przycisku instalacji lub naprawy.
 
+Osoby z już zainstalowanym spolszczeniem mogą wybrać **Napraw polskie znaki** — bez ponownego pobierania paczki. Jeśli ustawienie jest już obecne, przycisk pokaże **Znaki: ustawione**. Po zmianie należy uruchomić grę ponownie i sprawdzić wyświetlanie znaków.
+
 ## Aktualizacje
 
 Launcher sprawdza dostępność spolszczenia na [kashello.pl](https://kashello.pl) oraz nowych wersji launchera na GitHubie. Po aktualizacji gry należy poczekać na paczkę zgodną z nową wersją AION 2.

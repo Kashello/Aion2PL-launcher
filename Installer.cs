@@ -222,6 +222,22 @@ internal sealed class Installer
         var pak = State()?.Pak;
         return pak is null || pak.Build != game.Build || Hash(GamePath(pak.Path)) != pak.Sha256;
     }
+    internal bool RepairFont()
+    {
+        using var operation = Lock();
+        if (HasPending) throw new InvalidOperationException("Najpierw cofnij przerwaną operację przyciskiem przywracania.");
+        var game = GameInstallation.Read(root);
+        RequireReady(game.Build);
+        if (!game.DatPresent) throw new InvalidOperationException("Nie znaleziono pliku lokalizacji. Najpierw zainstaluj spolszczenie.");
+        var path = GamePath(FontCulture.Path);
+        var before = File.Exists(path) ? File.ReadAllBytes(path) : null;
+        var after = FontCulture.Add(before);
+        if (before is not null && before.SequenceEqual(after)) return false;
+        var state = State();
+        Apply(new Dictionary<string, byte[]?> { [FontCulture.Path] = after }, state, state, game.Build);
+        log("Ustawienia polskich znaków zostały zapisane.");
+        return true;
+    }
     internal void Restore(Dictionary<string, byte[]>? manualFiles = null, string? manualPak = null)
     {
         using var operation = Lock();
@@ -230,7 +246,7 @@ internal sealed class Installer
         RequireReady(game.Build);
         var state = State();
         var changes = new Dictionary<string, byte[]?>();
-        if (state is not null)
+        if (state is not null || manualFiles is not null)
         {
             var config = GamePath(FontCulture.Path);
             var currentConfig = File.Exists(config) ? File.ReadAllBytes(config) : null;
