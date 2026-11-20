@@ -47,7 +47,7 @@ internal sealed class UpdateClient : IDisposable
     {
         http = new HttpClient(handler ?? new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false, UseDefaultCredentials = false });
         http.Timeout = TimeSpan.FromSeconds(90);
-        http.DefaultRequestHeaders.UserAgent.ParseAdd("Aion2PL-Launcher/0.5.6");
+        http.DefaultRequestHeaders.UserAgent.ParseAdd("Aion2PL-Launcher/0.7.0");
     }
     internal static Uri Https(string url)
     {
@@ -152,7 +152,7 @@ internal sealed class UpdateClient : IDisposable
         }
         catch { if (created) File.Delete(destination); throw; }
     }
-    internal async Task<Dictionary<string, byte[]>> VerifiedFiles(Release release, string cacheFolder, Action<string> log, IProgress<int>? progress, CancellationToken ct)
+    internal async Task<PackageFiles> VerifiedFiles(Release release, string cacheFolder, Action<string> log, IProgress<int>? progress, CancellationToken ct)
     {
         release.Validate();
         Directory.CreateDirectory(cacheFolder);
@@ -167,6 +167,7 @@ internal sealed class UpdateClient : IDisposable
         }
         else log("Korzystam ze sprawdzonej kopii paczki na tym komputerze.");
         try { return await Task.Run(() => Package.Read(zip), ct); }
+        catch (LauncherTooOldException) { throw; }
         catch (InvalidDataException) { File.Delete(zip); throw; }
     }
     internal Task DownloadLauncher(LauncherRelease release, string destination, Action<string> log, CancellationToken ct)
@@ -201,21 +202,43 @@ internal sealed class UpdateClient : IDisposable
     public void Dispose() => http.Dispose();
 }
 
+/// <summary>Game files from a release ZIP plus the original Steam hashes they replace (Aion2PL-instalacja.json).</summary>
+internal sealed class PackageFiles : Dictionary<string, byte[]>
+{
+    internal PackageFiles() : base(StringComparer.OrdinalIgnoreCase) { }
+    internal string Build { get; set; } = "";
+    internal string? Version { get; set; }
+    internal Dictionary<string, string> Originals { get; } = new(StringComparer.OrdinalIgnoreCase);
+}
+
+/// <summary>The package uses a newer format than this launcher understands; the launcher itself must be updated.</summary>
+internal sealed class LauncherTooOldException(string message) : IOException(message);
+
 internal static class Package
 {
+    internal const string ManifestName = "Aion2PL-instalacja.json";
+    internal const int SupportedFormat = 3;
+    static readonly string[] ResourcePaths = new[] { "en", "en-US", "fr", "fr-FR" }
+        .Select(code => $"Engine/Content/Localization/Engine/Platforms/Windows/{code}/Engine.locres").ToArray();
+    internal static bool Allowed(string name) =>
+        name.Equals(GameInstallation.FrPakPath, StringComparison.OrdinalIgnoreCase) || name.Equals(GameInstallation.ConfigPath, StringComparison.OrdinalIgnoreCase)
+        || ResourcePaths.Contains(name, StringComparer.OrdinalIgnoreCase);
+    static bool LayoutMatches(int format, Dictionary<string, byte[]> files) =>
+        files.ContainsKey(GameInstallation.ConfigPath) && (format == 2
+            ? files.Count == 2 && files.ContainsKey(GameInstallation.FrPakPath)
+            : format == 3 && files.Count == ResourcePaths.Length + 1 && ResourcePaths.All(files.ContainsKey));
     internal static bool FilesMatch(GameInstallation game, Dictionary<string, byte[]> files)
     {
-        if (game.Updating || !files.ContainsKey(GameInstallation.DatPath)) return false;
+        if (game.Updating || !(LayoutMatches(2, files) || LayoutMatches(3, files))) return false;
         foreach (var (name, bytes) in files)
         {
-            if (!SafeName(name).StartsWith("Aion2/Content/L10N/", StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("Nieprawidłowa ścieżka lokalizacji.");
+            if (!Allowed(SafeName(name))) throw new InvalidDataException("Nieprawidłowa ścieżka lokalizacji.");
             var sha = Installer.Hash(Path.Combine(game.Root, name));
             if (!string.Equals(sha, Convert.ToHexString(SHA256.HashData(bytes)), StringComparison.OrdinalIgnoreCase)) return false;
         }
         return true;
     }
-    internal static bool IsInstalled(GameInstallation game, Dictionary<string, byte[]> files) =>
-        !game.EnglishPakPresent && FilesMatch(game, files);
+    internal static bool IsInstalled(GameInstallation game, Dictionary<string, byte[]> files) => FilesMatch(game, files);
     internal static string SafeName(string name)
     {
         name = name.Replace('\\', '/');
@@ -226,12 +249,13 @@ internal static class Package
             throw new InvalidDataException("ZIP zawiera niebezpieczną ścieżkę.");
         return trimmed;
     }
-    internal static Dictionary<string, byte[]> Read(string file)
+    internal static PackageFiles Read(string file)
     {
         using var archive = ZipFile.OpenRead(file);
         if (archive.Entries.Count > 2000) throw new InvalidDataException("ZIP zawiera zbyt wiele plików.");
         var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var files = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
+        var files = new PackageFiles();
+        byte[]? manifest = null;
         long total = 0;
         foreach (var entry in archive.Entries)
         {
@@ -258,16 +282,49 @@ internal static class Package
                 output.Write(buffer, 0, count);
             }
             if (output.Length != entry.Length || ~crc != entry.Crc32) throw new InvalidDataException("Uszkodzony plik w ZIP.");
-            if (name.StartsWith("Aion2/", StringComparison.OrdinalIgnoreCase))
+            if (name.Equals(ManifestName, StringComparison.OrdinalIgnoreCase)) manifest = output.ToArray();
+            else if (name.StartsWith("Aion2/", StringComparison.OrdinalIgnoreCase) || name.StartsWith("Engine/", StringComparison.OrdinalIgnoreCase))
             {
-                if (!name.StartsWith("Aion2/Content/L10N/", StringComparison.OrdinalIgnoreCase) ||
-                    new[] { ".exe", ".dll", ".cmd", ".bat", ".ps1", ".com" }.Contains(Path.GetExtension(name).ToLowerInvariant()))
-                    throw new InvalidDataException("Paczka próbuje zmienić pliki poza lokalizacją gry.");
+                if (name.StartsWith("Aion2/Content/L10N/", StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException("Paczka w starym formacie (luźny DAT). Po patchu 26429009 gra pokazuje z nią „???” — poczekaj na nowe wydanie.");
+                if (!Allowed(name)) throw new InvalidDataException("Paczka próbuje zmienić pliki poza lokalizacją gry.");
                 files.Add(name, output.ToArray());
             }
         }
-        if (!files.TryGetValue(GameInstallation.DatPath, out var dat) || dat.Length < 20 || BitConverter.ToInt32(dat) != 2)
-            throw new InvalidDataException("Brak poprawnego pliku L10NString.dat w paczce.");
+        if (manifest is null) throw new InvalidDataException("Brak opisu instalacji w ZIP.");
+        try
+        {
+            using var document = JsonDocument.Parse(manifest);
+            var rootElement = document.RootElement;
+            var format = rootElement.GetProperty("format").GetInt32();
+            if (format > SupportedFormat)
+                throw new LauncherTooOldException("Ta paczka spolszczenia wymaga nowszej wersji launchera. Zaktualizuj launcher (przycisk „Sprawdź launcher” albo https://github.com/Kashello/Aion2PL-launcher/releases/latest).");
+            if (!LayoutMatches(format, files)) throw new InvalidDataException("Zestaw plików nie pasuje do formatu paczki.");
+            if (rootElement.TryGetProperty("version", out var version) && version.ValueKind == JsonValueKind.String)
+            {
+                files.Version = version.GetString();
+                Release.Date(files.Version!);
+            }
+            files.Build = rootElement.GetProperty("steam_buildid").GetString() ?? "";
+            if (!Regex.IsMatch(files.Build, @"^\d+$")) throw new InvalidDataException("Nieprawidłowy build w opisie paczki.");
+            var described = rootElement.GetProperty("files");
+            if (described.EnumerateObject().Count() != files.Count) throw new InvalidDataException("Opis paczki nie zgadza się z plikami.");
+            foreach (var (name, bytes) in files)
+            {
+                var entry = described.GetProperty(name);
+                if (!string.Equals(entry.GetProperty("sha256").GetString(), Convert.ToHexString(SHA256.HashData(bytes)), StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException("Plik w paczce różni się od opisu: " + name);
+                if (entry.TryGetProperty("original_sha256", out var original))
+                {
+                    var value = original.GetString() ?? "";
+                    if (!Regex.IsMatch(value, @"\A[0-9a-fA-F]{64}\z")) throw new InvalidDataException("Nieprawidłowa suma oryginału w opisie paczki.");
+                    files.Originals[name] = value.ToUpperInvariant();
+                }
+            }
+        }
+        catch (Exception e) when (e is JsonException or KeyNotFoundException or InvalidOperationException or FormatException or ArgumentNullException)
+        { throw new InvalidDataException("Uszkodzony opis instalacji w paczce.", e); }
+        if (files.ContainsKey(GameInstallation.FrPakPath) && !files.Originals.ContainsKey(GameInstallation.FrPakPath)) throw new InvalidDataException("Opis paczki nie podaje sumy oryginalnego PAK fr-FR.");
         return files;
     }
 }

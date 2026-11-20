@@ -43,6 +43,17 @@ internal static class SelfTest
             bool rejected = false;
             try { GameInstallation.Read(root); } catch (InvalidDataException) { rejected = true; }
             Check(rejected, "Odrzucenie innej gry");
+            File.WriteAllText(manifest, Manifest());
+            var playtest = Path.Combine(library, "steamapps/common/AION 2 Playtest");
+            Directory.CreateDirectory(Path.Combine(playtest, "Aion2/Content/Paks"));
+            string? playtestError = null;
+            try { GameInstallation.Read(playtest); } catch (InvalidDataException e) { playtestError = e.Message; }
+            Check(playtestError is not null && playtestError.Contains("„AION2”") && playtestError.Contains("AION 2 Playtest") && playtestError.Contains("Przeglądaj pliki lokalne"), "Folder Playtest w bibliotece: ostrzeżenie o innym folderze niż w manifeście Steam");
+            var copy = Path.Combine(scratch, "Kopia gry/AION2");
+            Directory.CreateDirectory(Path.Combine(copy, "Aion2/Content/Paks"));
+            string? copyError = null;
+            try { GameInstallation.Read(copy); } catch (InvalidDataException e) { copyError = e.Message; }
+            Check(copyError is not null && copyError.Contains("nie leży w bibliotece Steam"), "Kopia gry spoza biblioteki Steam: czytelne ostrzeżenie");
             Check(File.ReadAllText(dat) == "fixture" && File.ReadAllText(pak + ".backup") == "fixture", "Odczyt nie zmienia plików");
             File.WriteAllText(report, JsonSerializer.Serialize(checks, new JsonSerializerOptions { WriteIndented = true }));
         }

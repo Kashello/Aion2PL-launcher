@@ -5,7 +5,7 @@ namespace Aion2PL;
 
 internal sealed partial class LauncherWindow
 {
-    readonly UpdateClient client = new();
+    readonly UpdateClient client;
     readonly CancellationTokenSource lifetime = new();
     readonly System.Windows.Forms.Timer updateTimer = new() { Interval = 3 * 60 * 60 * 1000 };
     readonly RichTextBox logBox = new() { Dock = DockStyle.Bottom, Height = 235, ReadOnly = true, Visible = false,
@@ -13,14 +13,16 @@ internal sealed partial class LauncherWindow
         Font = new Font("Consolas", 8.5f), BorderStyle = BorderStyle.FixedSingle, DetectUrls = false };
     readonly CheckBox details = new() { Text = "Pokaż szczegóły", AutoSize = true, Margin = new Padding(12, 17, 0, 0) };
     readonly Label versions = new();
-    readonly string dataRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Aion2PL");
-    Button choose = null!, refresh = null!, install = null!, restore = null!, fixFont = null!, checkLauncher = null!;
+    readonly string dataRoot;
+    bool localPackage;
+    internal Release? CurrentRelease => release;
+    Button choose = null!, refresh = null!, install = null!, restore = null!, checkLauncher = null!;
     Release? release;
     InstallState? installed;
     Installer? installer;
     bool busy, pending;
     bool noPublishedRelease;
-    Dictionary<string, byte[]>? manualFiles;
+    PackageFiles? manualFiles;
     static readonly Color Good = Color.FromArgb(110, 231, 183);
     static readonly Color Bad = Color.FromArgb(253, 164, 175);
     static readonly Color Waiting = Color.FromArgb(252, 211, 77);
@@ -41,7 +43,29 @@ internal sealed partial class LauncherWindow
     }
     internal void ShowDetails() => details.Checked = true;
     internal void PreviewRelease(Release value) { release = value; RenderStatus(); }
-    internal void PreviewManualFiles(Dictionary<string, byte[]> files) { manualFiles = files; RenderStatus(); }
+    internal void PreviewManualFiles(PackageFiles files) { manualFiles = files; RenderStatus(); }
+    /// <summary>Offline test of a locally built release ZIP before publishing (no kashello.pl, no GitHub).</summary>
+    internal void UseLocalPackage(string zip)
+    {
+        var files = Package.Read(zip);
+        if (files.Version is null) throw new InvalidDataException("Opis paczki nie podaje wersji wydania.");
+        var bytes = File.ReadAllBytes(zip);
+        var local = new Release("aion2pl", files.Version, files.Build, "https://localhost/aion2pl-local-package", Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)), bytes.Length);
+        local.Validate();
+        var cache = Path.Combine(dataRoot, "packages");
+        Directory.CreateDirectory(cache);
+        var cached = Path.Combine(cache, local.Sha256.ToLowerInvariant() + ".zip");
+        if (!File.Exists(cached) || Installer.Hash(cached) != local.Sha256) Installer.AtomicWrite(cached, bytes);
+        localPackage = true;
+        release = local;
+        manualFiles = files;
+        noPublishedRelease = false;
+        serverMessage = "Tryb testu lokalnej paczki.";
+        Text += " — TEST LOKALNEJ PACZKI";
+        Log($"Tryb testu lokalnej paczki {Path.GetFileName(zip)}: wersja {files.Version}, build {files.Build}. Bez połączenia z kashello.pl i GitHubem.");
+        ShowDetails();
+        RefreshGame();
+    }
     internal object PreviewState => new { GameBuild = installation?.Build, PackageBuild = release?.SteamBuildId,
         BuildText = build.Text, BuildColor = ColorTranslator.ToHtml(build.ForeColor), Status = status.Text, InstallEnabled = install.Enabled };
     static bool Expected(Exception e) => e is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException or InvalidOperationException or JsonException or FormatException or HttpRequestException or OperationCanceledException;
@@ -109,9 +133,9 @@ internal sealed partial class LauncherWindow
         bool manualMatch = false;
         try { manualMatch = compatible && installed is null && manualFiles is not null && Package.FilesMatch(game!, manualFiles); }
         catch (Exception e) when (Expected(e)) { Log(e.Message); }
-        versions.Text = $"Zainstalowano: {installed?.Version ?? (manualMatch ? release!.Version + " (ręcznie)" : game?.DatPresent == true ? "wykryto plik / trwa weryfikacja" : "—")}    •    Dostępne: {release?.Version ?? "—"}";
+        versions.Text = $"Zainstalowano: {installed?.Version ?? (manualMatch ? release!.Version + " (ręcznie)" : busy && manualFiles is null && compatible ? "trwa weryfikacja" : "—")}    •    Dostępne: {release?.Version ?? "—"}";
         bool intact = false;
-        try { intact = installed is not null ? installer?.Intact(installed) == true : manualMatch && !game!.EnglishPakPresent && installer?.FontFixEnabled() == true; }
+        try { intact = installed is not null ? installer?.Intact(installed) == true : manualMatch; }
         catch (Exception e) when (Expected(e)) { Log(e.Message); }
         status.Text = pending ? "Wykryto przerwaną operację.\nZamknij grę i użyj przycisku cofnięcia operacji." : game switch
         {
@@ -119,14 +143,20 @@ internal sealed partial class LauncherWindow
             { Updating: true } => "Poczekaj na zakończenie aktualizacji Steam.",
             _ when release is null => serverMessage,
             _ when release.SteamBuildId != game.Build => $"Czekamy na spolszczenie do buildu {game.Build}.\nDostępna paczka pasuje do buildu {release.SteamBuildId}.",
-            _ when manualMatch && intact => "Spolszczenie jest już zainstalowane ręcznie i zgodne.\nMożesz uruchomić grę z językiem English.",
+            _ when manualMatch && intact => "Spolszczenie jest już zainstalowane ręcznie i zgodne.\nW grze wybierz język Polski.",
             _ when installed is not null && Release.Date(release.Version) < Release.Date(installed.Version) => "Masz nowsze wydanie niż obecnie dostępne na stronie.",
-            _ when installed is not null && !release.IsNewerThan(installed.Version) && intact => "Spolszczenie jest aktualne.\nMożesz uruchomić grę z językiem English.",
+            _ when installed is not null && !release.IsNewerThan(installed.Version) && intact => "Spolszczenie jest aktualne.\nW grze wybierz język Polski.",
             _ when installed is not null && release.IsNewerThan(installed.Version) => $"Nowe wydanie {release.Version} jest gotowe do pobrania.",
-            _ when game.EnglishPakPresent && game.DatPresent => "Steam przywrócił angielskie pliki.\nZainstaluj zgodne spolszczenie ponownie.",
+            _ when installed is not null && !intact => "Steam przywrócił oryginalne pliki.\nZainstaluj zgodne spolszczenie ponownie.",
             _ => "Zgodne spolszczenie jest gotowe do instalacji.\nZamknij grę przed rozpoczęciem."
         };
-        if (busy && installed is null && release is not null && compatible && game?.DatPresent == true && manualFiles is null)
+        try
+        {
+            if (!busy && !pending && game is { Updating: false } && installer?.LegacyLeftovers() is { Any: true } leftovers)
+                status.Text += leftovers.LooseDat ? "\nWykryto luźny DAT starej metody — instalacja zaproponuje usunięcie." : "\nAngielski PAK jest wyłączony (stara metoda) — może być potrzebna weryfikacja Steam.";
+        }
+        catch (Exception e) when (Expected(e)) { Log(e.Message); }
+        if (busy && installed is null && release is not null && compatible && manualFiles is null)
             status.Text = "Sprawdzam istniejące spolszczenie...\nPorównuję pliki z paczką dla Twojego buildu.";
         status.ForeColor = !pending && intact && compatible ? Good : game is { Updating: false } && !compatible && (release is not null || noPublishedRelease) ? Bad : Waiting;
         install.Text = intact && compatible && (installed is null || release?.Version == installed.Version) ? "Spolszczenie już zainstalowane" : installed is null ? "Zainstaluj spolszczenie" : "Zainstaluj / aktualizuj spolszczenie";
@@ -137,17 +167,12 @@ internal sealed partial class LauncherWindow
         catch (Exception e) when (Expected(e)) { Log(e.Message); needsOriginal = true; }
         restore.Text = pending ? "Cofnij przerwaną operację" : needsOriginal ? hasManualCopy ? "Przywróć z kopii PAK" : "Przywróć oryginał przez Steam" : "Przywróć oryginał";
         restore.Enabled = !busy && installer is not null && (installed is not null || pending || manualMatch);
-        bool fontReady = false;
-        try { fontReady = installer?.FontFixEnabled() == true; }
-        catch (Exception e) when (Expected(e)) { Log(e.Message); }
-        fixFont.Text = fontReady ? "Znaki: ustawione" : "Napraw polskie znaki";
-        fixFont.AccessibleName = fixFont.Text;
-        fixFont.Enabled = !busy && !pending && game is { Updating: false, DatPresent: true } && !fontReady;
         choose.Enabled = refresh.Enabled = checkLauncher.Enabled = !busy;
     }
-    async Task CheckLauncherManually()
+    internal async Task CheckLauncherManually()
     {
         if (busy) return;
+        if (localPackage) { Log("Tryb testu lokalnej paczki: nie sprawdzam aktualizacji launchera na GitHubie."); return; }
         busy = true;
         RenderStatus();
         try
@@ -172,24 +197,15 @@ internal sealed partial class LauncherWindow
         catch (Exception e) when (Expected(e) || e is System.ComponentModel.Win32Exception or KeyNotFoundException) { Failure(e); }
         finally { busy = false; if (!IsDisposed) RenderStatus(); }
     }
-    async Task RepairPolishCharacters()
-    {
-        if (busy || installer is null || !fixFont.Enabled) return;
-        busy = true;
-        RenderStatus();
-        try
-        {
-            var target = installer;
-            var changed = await Task.Run(() => target.RepairFont());
-            MessageBox.Show(this, changed ? "Ustawienia polskich znaków zapisano. Uruchom ponownie grę, aby sprawdzić książki i tytuły." : "Ustawienia polskich znaków są już obecne.",
-                "Aion2PL", MessageBoxButtons.OK, MessageBoxIcon.Information);
-        }
-        catch (Exception e) when (Expected(e)) { Failure(e); }
-        finally { busy = false; RefreshGame(); }
-    }
-    async Task CheckUpdates()
+    internal async Task CheckUpdates()
     {
         if (busy) return;
+        if (localPackage)
+        {
+            RefreshGame();
+            Log("Tryb testu lokalnej paczki: odświeżono stan gry, bez łączenia z kashello.pl i GitHubem.");
+            return;
+        }
         busy = true;
         manualFiles = null;
         RefreshGame();
@@ -210,14 +226,15 @@ internal sealed partial class LauncherWindow
             release = result.Release;
             noPublishedRelease = release is null;
             serverMessage = result.Message;
-            if (release is not null && installed is null && installation is { DatPresent: true, Updating: false } && installation.Build == release.SteamBuildId)
+            if (release is not null && installed is null && installation is { Updating: false } && installation.Build == release.SteamBuildId)
             {
                 RenderStatus();
                 Log("Sprawdzam istniejące spolszczenie bez zmiany plików gry...");
                 manualFiles = await client.VerifiedFiles(release, Path.Combine(dataRoot, "packages"), Log, null, lifetime.Token);
-                Log(Package.IsInstalled(installation, manualFiles) && installer?.FontFixEnabled() == true ? "Wykryto zgodne spolszczenie i ustawienie polskich znaków." : "Dostępna instalacja lub naprawa spolszczenia i ustawień polskich znaków.");
+                Log(Package.IsInstalled(installation, manualFiles) ? "Wykryto już zainstalowane zgodne spolszczenie. Ponowna instalacja nie jest potrzebna." : "Dostępna instalacja lub naprawa spolszczenia.");
             }
         }
+        catch (LauncherTooOldException e) { noPublishedRelease = false; release = null; serverMessage = "Dostępna paczka wymaga nowszego launchera.\nKliknij „Sprawdź launcher”."; Log(e.Message); }
         catch (Exception e) when (Expected(e)) { release = null; noPublishedRelease = false; serverMessage = "Nie udało się sprawdzić aktualizacji. Spróbuj później.\nZainstalowane pliki pozostają bez zmian."; Log(e is OperationCanceledException ? "Przekroczono czas połączenia z serwerem." : e.Message); }
         finally { busy = false; RenderStatus(); }
     }
@@ -228,14 +245,24 @@ internal sealed partial class LauncherWindow
         RenderStatus();
         try
         {
-            Installer.RequireClosed();
+            Installer.RequireClosed(installation.Root);
             var selected = release;
             var target = installer;
+            var leftovers = target.LegacyLeftovers();
+            if (leftovers.EnglishPakMissing && !leftovers.EnglishPakRestorable)
+            {
+                busy = false;
+                OfferSteamValidation("Wcześniejsza metoda spolszczenia wyłączyła angielski PAK, a launcher nie ma jego kopii dla tego buildu. Po patchu daje to „???”.\n\nNajpierw sprawdź spójność plików w Steam (przywróci oryginały), potem kliknij Odśwież i zainstaluj spolszczenie ponownie.\n\nOtworzyć sprawdzanie plików w Steam?");
+                return;
+            }
+            bool cleanup = leftovers.LooseDat && MessageBox.Show(this,
+                "Wykryto luźny plik L10NString.dat ze starej metody spolszczenia (Content\\L10N\\Text\\en-US). Po patchu daje on „???”.\n\nUsunąć go podczas instalacji? Kopia zostanie w historii launchera.",
+                "Sprzątanie starej metody", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes;
             var progress = new Progress<int>(value => { install.Text = $"Pobieranie: {value}%"; });
             var files = await client.VerifiedFiles(selected, Path.Combine(dataRoot, "packages"), Log, progress, lifetime.Token);
             install.Text = "Sprawdzanie i instalacja...";
-            await Task.Run(() => target.Install(selected, files));
-            MessageBox.Show(this, "Spolszczenie zostało zainstalowane. Uruchom grę z językiem English.", "Aion2PL", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            await Task.Run(() => target.Install(selected, files, cleanup));
+            MessageBox.Show(this, "Spolszczenie zostało zainstalowane.\n\nUruchom grę, wybierz Polski jako język tekstu i otwórz dziennik zadań.", "Aion2PL", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         catch (Exception e) when (Expected(e)) { Failure(e); }
         finally { busy = false; RefreshGame(); }
@@ -263,19 +290,7 @@ internal sealed partial class LauncherWindow
         }
         if (needsOriginal && manualPak is null)
         {
-            if (MessageBox.Show(this,
-                "To spolszczenie wgrano wcześniej ręcznie lub zmienił się build gry. Launcher nie ma potwierdzonej kopii oryginalnego PAK.\n\nOtworzyć sprawdzanie plików w Steam? Po jego zakończeniu wróć tutaj, kliknij Odśwież, a następnie Przywróć oryginał.",
-                "Przywracanie przez Steam", MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes)
-            {
-                try
-                {
-                    Installer.RequireClosed();
-                    Process.Start(new ProcessStartInfo("steam://validate/3393110") { UseShellExecute = true });
-                    Log("Otwarto weryfikację Steam. Poczekaj na zakończenie, kliknij Odśwież i Przywróć oryginał. Pliki gry pozostają na razie bez zmian.");
-                    ShowDetails();
-                }
-                catch (Exception e) when (Expected(e) || e is System.ComponentModel.Win32Exception) { Failure(e); }
-            }
+            OfferSteamValidation("To spolszczenie wgrano wcześniej ręcznie lub zmienił się build gry. Launcher nie ma potwierdzonej kopii oryginalnego angielskiego PAK.\n\nOtworzyć sprawdzanie plików w Steam? Po jego zakończeniu wróć tutaj, kliknij Odśwież, a następnie Przywróć oryginał.");
             return;
         }
         var question = pending ? "Cofnąć przerwaną operację?" : manualPak is not null ?
@@ -283,12 +298,43 @@ internal sealed partial class LauncherWindow
         if (MessageBox.Show(this, question, "Aion2PL", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
         busy = true;
         RenderStatus();
-        try { var target = installer; var files = manualFiles; await Task.Run(() => target.Restore(files, manualPak)); }
+        bool steamNeeded = false;
+        try { var target = installer; var files = manualFiles; steamNeeded = await Task.Run(() => target.Restore(files, manualPak)); }
         catch (Exception e) when (Expected(e)) { Failure(e); }
         finally { busy = false; RefreshGame(); }
+        if (steamNeeded) OfferSteamValidation("Launcher nie ma kopii oryginalnego PAK fr-FR (spolszczenie wgrano ręcznie). Pozostałe pliki przywrócono.\n\nOtworzyć sprawdzanie plików w Steam, aby odzyskać oryginalny PAK?");
+    }
+    void OfferRunningGameFolder(GameRunningElsewhereException e)
+    {
+        Log(e.Message);
+        ShowDetails();
+        GameInstallation? running = null;
+        try { if (e.RunningRoot is { } root) running = GameInstallation.Read(root); }
+        catch (Exception error) when (Expected(error)) { Log("Folder działającej gry nie jest poprawną instalacją Steam: " + error.Message); }
+        if (running is null)
+        {
+            MessageBox.Show(this, e.Message, "Wybrany inny folder gry", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+        if (MessageBox.Show(this, e.Message + $"\n\nUstawić folder gry na {running.Root}? Potem zamknij grę i kliknij Zainstaluj ponownie.",
+            "Wybrany inny folder gry", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
+        UseGameFolder(running);
+    }
+    void OfferSteamValidation(string question)
+    {
+        if (MessageBox.Show(this, question, "Przywracanie przez Steam", MessageBoxButtons.YesNo, MessageBoxIcon.Information) != DialogResult.Yes) return;
+        try
+        {
+            Installer.RequireClosed(installation?.Root);
+            Process.Start(new ProcessStartInfo("steam://validate/3393110") { UseShellExecute = true });
+            Log("Otwarto weryfikację Steam. Poczekaj na zakończenie i kliknij Odśwież. Launcher nie zmienia teraz plików gry.");
+            ShowDetails();
+        }
+        catch (Exception e) when (Expected(e) || e is System.ComponentModel.Win32Exception) { Failure(e); }
     }
     void Failure(Exception e)
     {
+        if (e is GameRunningElsewhereException elsewhere) { OfferRunningGameFolder(elsewhere); return; }
         var message = e is UnauthorizedAccessException ? "Brak dostępu do zapisu. Zamknij launcher i uruchom go jako administrator, aby zmienić pliki w tym folderze gry." : e is OperationCanceledException ? "Przekroczono czas pobierania. Spróbuj później." : e.Message;
         Log(message);
         ShowDetails();
@@ -302,7 +348,7 @@ internal static class LiveCheck
     {
         using var client = new UpdateClient();
         var logs = new List<string>();
-        try { Installer.RequireClosed(); logs.Add("Sprawdzenie procesów gry: gra zamknięta."); }
+        try { Installer.RequireClosed(GameInstallation.Find()?.Root); logs.Add("Sprawdzenie procesów gry: gra zamknięta."); }
         catch (InvalidOperationException e) { logs.Add(e.Message); }
         var result = await client.Latest(logs.Add, CancellationToken.None);
         if (result.Release is not { } release) throw new InvalidOperationException(result.Message);

@@ -7,6 +7,8 @@ internal record GameInstallation(string Root, string Build, bool Updating, bool 
 {
     internal const string DatPath = "Aion2/Content/L10N/Text/en-US/L10NString.dat";
     internal const string PakPath = "Aion2/Content/Paks/L10N/Text/en-US/pakchunk502000-Windows_0_P.pak";
+    internal const string FrPakPath = "Aion2/Content/Paks/L10N/Text/fr-FR/pakchunk507000-Windows_0_P.pak";
+    internal const string ConfigPath = "Aion2/Config/UserGame.ini";
 
     internal static string Field(string text, string name) =>
         Regex.Match(text, "\"" + Regex.Escape(name) + "\"\\s+\"([^\"\\r\\n]*)\"").Groups[1].Value;
@@ -15,14 +17,34 @@ internal record GameInstallation(string Root, string Build, bool Updating, bool 
     {
         root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(root));
         var manifest = Path.GetFullPath(Path.Combine(root, "../../appmanifest_3393110.acf"));
+        const string Hint = " Wskaż folder z Steam → AION 2 → Zarządzaj → Przeglądaj pliki lokalne.";
+        if (!File.Exists(manifest))
+            throw new InvalidDataException($"Folder {root} nie leży w bibliotece Steam z AION 2 (brak steamapps\\appmanifest_3393110.acf). To może być kopia gry albo inna aplikacja, np. AION 2 Playtest." + Hint);
         var text = File.ReadAllText(manifest);
         var build = Field(text, "buildid");
-        if (Field(text, "appid") != "3393110" || Field(text, "installdir") != Path.GetFileName(root) ||
-            !Regex.IsMatch(build, @"^\d+$") || !Directory.Exists(Path.Combine(root, "Aion2/Content/Paks")))
-            throw new InvalidDataException("Wskaż główny folder AION 2 w bibliotece Steam.");
+        var installdir = Field(text, "installdir");
+        if (Field(text, "appid") != "3393110" || !Regex.IsMatch(build, @"^\d+$"))
+            throw new InvalidDataException("Manifest Steam AION 2 w tej bibliotece jest nieprawidłowy." + Hint);
+        if (!installdir.Equals(Path.GetFileName(root), StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException($"Steam ma AION 2 w folderze „{installdir}”, a wybrano „{Path.GetFileName(root)}”. To może być kopia gry albo inna aplikacja, np. AION 2 Playtest." + Hint);
+        if (!Directory.Exists(Path.Combine(root, "Aion2/Content/Paks")))
+            throw new InvalidDataException("W wybranym folderze brakuje Aion2\\Content\\Paks — wskaż główny folder gry." + Hint);
         var target = Field(text, "TargetBuildID");
         bool updating = Field(text, "StateFlags") != "4" || (target.Length > 0 && target != build);
         return new(root, build, updating, File.Exists(Path.Combine(root, DatPath)), File.Exists(Path.Combine(root, PakPath)));
+    }
+
+    /// <summary>Game folder of a running ...\Aion2\Binaries\Win64\AION2.exe, or null for any other path.</summary>
+    internal static string? RootFromExecutable(string? path)
+    {
+        if (path is null) return null;
+        var win64 = Path.GetDirectoryName(Path.GetFullPath(path));
+        var binaries = win64 is null ? null : Path.GetDirectoryName(win64);
+        var aion2 = binaries is null ? null : Path.GetDirectoryName(binaries);
+        if (aion2 is null || !Path.GetFileName(win64!).Equals("Win64", StringComparison.OrdinalIgnoreCase) ||
+            !Path.GetFileName(binaries!).Equals("Binaries", StringComparison.OrdinalIgnoreCase) || !Path.GetFileName(aion2).Equals("Aion2", StringComparison.OrdinalIgnoreCase))
+            return null;
+        return Path.GetDirectoryName(aion2);
     }
 
     internal static IEnumerable<string> Libraries(string steamRoot)

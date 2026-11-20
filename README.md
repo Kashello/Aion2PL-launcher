@@ -13,11 +13,18 @@ Na stronie wydania plik znajduje się w sekcji **Assets**. Launcher działa w sy
 1. Zamknąć AION 2 i uruchomić `Aion2PL.exe`.
 2. Jeśli launcher nie znajdzie gry, wskazać folder instalacyjny AION 2.
 3. Sprawdzić informację o zgodności wersji gry i spolszczenia, a następnie wybrać **Zainstaluj spolszczenie**.
-4. Po zakończeniu uruchomić grę z językiem tekstu **English**.
+4. Po zakończeniu uruchomić grę i w ustawieniach wybrać język tekstu **Polski**.
 
-Launcher dodaje również ustawienie poprawiające wyświetlanie polskich znaków w części książek i tytułów. Jeśli spolszczenie było wcześniej wgrane ręcznie, może być potrzebne użycie przycisku instalacji lub naprawy.
+Dla Steam build 26728906 launcher 0.7.0 instaluje polskie zasoby tekstowe Engine.locres i ustawienia języka. W ustawieniach tekstu „Polski” zajmuje miejsce angielskiego. Na ekranie startowym może pozostać „Click the screen”. Działanie tłumaczenia sprawdzisz w dzienniku zadań. Launcher obsługuje również wcześniejsze paczki dla slotu francuskiego.
 
-Osoby z już zainstalowanym spolszczeniem mogą wybrać **Napraw polskie znaki** — bez ponownego pobierania paczki. Jeśli ustawienie jest już obecne, przycisk pokaże **Znaki: ustawione**. Po zmianie należy uruchomić grę ponownie i sprawdzić wyświetlanie znaków.
+Starsza metoda (plik `L10NString.dat` w folderze `en-US` i wyłączony angielski PAK) po tym patchu pokazuje w grze „???”. Launcher 0.6.0 wykrywa jej pozostałości. Proponuje usunięcie luźnego DAT-a (kopia zostaje w historii launchera) i przywraca angielski PAK ze swojej kopii. Gdy kopii nie ma, poprosi o sprawdzenie spójności plików w Steam przed instalacją.
+
+### Najczęstsze pytania
+
+- **Gdzie jest polski?** W ustawieniach gry na liście języka tekstu wybierz **Polski**.
+- **Niektóre okna lub banery są po francusku.** To znane. Te teksty pochodzą z innych plików silnika gry, których spolszczenie nie zmienia.
+- **Po aktualizacji gry spolszczenie zniknęło.** Steam przywrócił oryginalny plik. Launcher pokaże to w stanie instalacji. Poczekaj na paczkę zgodną z nowym buildem gry i zainstaluj ją ponownie.
+- **Launcher nie chce instalować („nie jest oryginałem Steam”).** Plik francuski w grze został wcześniej zmieniony (np. ręcznie lub innym spolszczeniem). Sprawdź spójność plików gry w Steam i spróbuj ponownie.
 
 ## Aktualizacje
 
@@ -25,11 +32,11 @@ Launcher sprawdza dostępność spolszczenia na [kashello.pl](https://kashello.p
 
 Przycisk **Sprawdź launcher** pozwala w dowolnej chwili sprawdzić jego aktualizacje i wyświetlić informację o bieżącym stanie.
 
-**Ważne:** użytkownicy launcherów starszych niż 0.5.4 muszą pobrać nowy plik EXE ręcznie jeden raz. Wersja 0.5.4 potrafi automatycznie pobierać kolejne wydania launchera.
+**Ważne:** użytkownicy launcherów starszych niż 0.5.4 muszą pobrać nowy plik EXE ręcznie jeden raz. Wersja 0.5.4 potrafi automatycznie pobierać kolejne wydania launchera. Paczki po patchu 26429009 wymagają launchera 0.6.0 — starsze launchery ich nie zainstalują.
 
-## Przywracanie oryginału
+## Przywracanie oryginału (cofnięcie spolszczenia)
 
-Po zamknięciu gry wybrać w launcherze **Przywróć oryginał** i postępować zgodnie z wyświetlanymi komunikatami. Jeśli potrzebnych plików nie uda się odtworzyć z kopii, launcher wskaże weryfikację plików gry przez Steam.
+Po zamknięciu gry wybrać w launcherze **Przywróć oryginał** i postępować zgodnie z wyświetlanymi komunikatami. Potem w grze wybrać z powrotem dowolny język. Launcher przywraca oryginalny francuski PAK z kopii i poprzedni `UserGame.ini`. Jeśli potrzebnych plików nie uda się odtworzyć z kopii (np. spolszczenie wgrano ręcznie), launcher wskaże weryfikację plików gry przez Steam.
 
 ## Zgłaszanie błędów
 

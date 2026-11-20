@@ -17,10 +17,25 @@ internal static class Program
         ApplicationConfiguration.Initialize();
         using var fonts = AppFonts.Shared;
         if (args is ["--self-test", var output]) { try { SelfTest.Run(output); UpdateTests.Run(output).GetAwaiter().GetResult(); } catch (Exception e) { File.WriteAllText(output + ".error.txt", e.ToString()); Environment.ExitCode = 1; } return; }
+        if (args is ["--self-test", var reportPath, var releaseZip])
+        {
+            try { SelfTest.Run(reportPath); UpdateTests.Run(reportPath, releaseZip).GetAwaiter().GetResult(); }
+            catch (Exception e) { File.WriteAllText(reportPath + ".error.txt", e.ToString()); Environment.ExitCode = 1; }
+            return;
+        }
         if (args is ["--verify-live", var liveReport]) { try { LiveCheck.Run(liveReport).GetAwaiter().GetResult(); } catch (Exception e) { File.WriteAllText(liveReport + ".error.txt", e.ToString()); Environment.ExitCode = 1; } return; }
         if (args is ["--inspect", var report])
         {
             File.WriteAllText(report, JsonSerializer.Serialize(GameInstallation.Find(), new JsonSerializerOptions { WriteIndented = true }));
+            return;
+        }
+        if (args is ["--local-package", var localZip])
+        {
+            using var local = new LauncherWindow(false);
+            try { local.UseLocalPackage(Path.GetFullPath(localZip)); }
+            catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException or FormatException)
+            { MessageBox.Show("Nie można użyć lokalnej paczki: " + e.Message, "Aion2PL", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+            Application.Run(local);
             return;
         }
         using var window = new LauncherWindow(!args.Contains("--preview"));
@@ -42,6 +57,8 @@ internal static class Program
                     window.PreviewManualFiles(Package.Read(packagePath));
                 }
             }
+            int localArg = Array.IndexOf(args, "--local-package");
+            if (localArg >= 0 && localArg + 1 < args.Length) window.UseLocalPackage(Path.GetFullPath(args[localArg + 1]));
             if (args.Contains("--details")) window.ShowDetails();
             Application.DoEvents();
             using var bitmap = new Bitmap(window.Width, window.Height);
@@ -65,9 +82,11 @@ internal sealed partial class LauncherWindow : Form
     readonly string settings = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Aion2PL", "game-folder.txt");
     GameInstallation? installation;
 
-    internal LauncherWindow(bool checkNetwork)
+    internal LauncherWindow(bool checkNetwork, UpdateClient? updateClient = null, string? dataFolder = null)
     {
-        Text = "Aion2PL by kashello — 0.5.6";
+        client = updateClient ?? new UpdateClient();
+        dataRoot = dataFolder ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Aion2PL");
+        Text = "Aion2PL by kashello — 0.7.0";
         using var iconStream = typeof(Program).Assembly.GetManifestResourceStream("aion2pl.ico")!;
         using var loadedIcon = new Icon(iconStream);
         Icon = (Icon)loadedIcon.Clone();
@@ -135,11 +154,6 @@ internal sealed partial class LauncherWindow : Form
         checkLauncher.Size = new Size(164, 38);
         checkLauncher.Click += async (_, _) => await CheckLauncherManually();
         actions.Controls.Add(checkLauncher);
-        fixFont = Button("Napraw polskie znaki", true);
-        fixFont.Dock = DockStyle.None;
-        fixFont.Size = new Size(200, 38);
-        fixFont.Click += async (_, _) => await RepairPolishCharacters();
-        actions.Controls.Add(fixFont);
         actions.Controls.Add(details);
         right.Controls.Add(actions, 0, 5);
         install = Button("Zainstaluj spolszczenie", false, true);
@@ -169,8 +183,8 @@ internal sealed partial class LauncherWindow : Form
         };
         notice.LinkClicked += (_, _) => MessageBox.Show(this,
             "Używasz na własną odpowiedzialność — nie mogę zagwarantować braku bana. " +
-            "Dodajemy plik z polskimi tekstami i wyłączamy angielski PAK przez zmianę jego nazwy, aby gra wczytała spolszczenie. " +
-            "Nie zmieniamy zawartości oryginalnych plików gry ani plików EXE/DLL.\n\n" +
+            "Launcher instaluje zasoby językowe pasujące do buildu gry i dodaje nazwę „Polski” w ustawieniach. " +
+            "W bieżącym wydaniu polskie napisy są w plikach Engine.locres.\n\n" +
             "Od premiery sam używam spolszczenia i dotychczas nie otrzymałem blokady konta. " +
             "To moje doświadczenie, a nie gwarancja, że blokada nie wystąpi w przyszłości lub u innych graczy.\n\n— kashello",
             "Aion2PL — ważna informacja", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -195,6 +209,14 @@ internal sealed partial class LauncherWindow : Form
         AccessibleName = text, UseVisualStyleBackColor = false
     };
 
+    void UseGameFolder(GameInstallation selected)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(settings)!);
+        File.WriteAllText(settings, selected.Root);
+        installation = selected;
+        Log("Wybrano folder gry: " + selected.Root);
+        RefreshGame();
+    }
     void ChooseFolder()
     {
         using var picker = new FolderBrowserDialog { Description = "Wybierz główny folder AION2 (z folderem Aion2 w środku).", UseDescriptionForTitle = true, ShowNewFolderButton = false };
@@ -203,10 +225,11 @@ internal sealed partial class LauncherWindow : Form
         try
         {
             var selected = GameInstallation.Read(picker.SelectedPath);
-            Directory.CreateDirectory(Path.GetDirectoryName(settings)!);
-            File.WriteAllText(settings, selected.Root);
-            installation = selected;
-            RefreshGame();
+            var steam = GameInstallation.Find();
+            if (steam is not null && !steam.Root.Equals(selected.Root, StringComparison.OrdinalIgnoreCase) &&
+                MessageBox.Show(this, $"Steam ma AION 2 zainstalowane w:\n{steam.Root}\n\nWybrano:\n{selected.Root}\n\nUżyć wybranego folderu mimo to?",
+                    "Inny folder niż w Steam", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
+            UseGameFolder(selected);
         }
         catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException)
         { MessageBox.Show(this, e.Message, "Nie udało się wybrać folderu", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
